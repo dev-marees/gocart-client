@@ -8,6 +8,12 @@
     "start": "next start",
     "lint": "next lint"
   },
+  "allowScripts": {
+    "@tailwindcss/oxide": true,
+    "@tailwindcss/oxide@4.1.12": true,
+    "sharp": true,
+    "sharp@0.34.3": true
+  },
   "dependencies": {
     "next": "15.3.5",
     "react": "^19.2.1",

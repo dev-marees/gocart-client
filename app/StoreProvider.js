@@ -6,6 +6,9 @@ import { makeStore } from '../lib/store'
 import { setAuth, setLoading } from '@/lib/features/auth/authSlice'
 import { refreshAuthToken, isTokenExpired, graphqlRequest } from '@/lib/apiClient'
 import { GET_ME_QUERY } from '@/lib/graphql/user'
+import { GET_PRODUCTS_QUERY } from '@/lib/graphql/product'
+import { setProduct, setLoading as setProductLoading } from '@/lib/features/product/productSlice'
+import { detectCurrencyCodeFromEnv, setCurrency, CURRENCIES, COUNTRY_TO_CURRENCY } from '@/lib/features/currency/currencySlice'
 
 function AuthInitializer() {
   const dispatch = useDispatch()
@@ -158,6 +161,102 @@ function AuthInitializer() {
   return null
 }
 
+function ProductInitializer() {
+  const dispatch = useDispatch()
+  const hasFetchedRef = useRef(false)
+
+  useEffect(() => {
+    // 1. Try restoring previously cached backend products for instant display
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('gocart_cached_products')
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            dispatch(setProduct(parsed))
+          }
+        } catch {}
+      }
+    }
+
+    if (hasFetchedRef.current) return
+    hasFetchedRef.current = true
+
+    const loadProducts = async () => {
+      try {
+        const data = await graphqlRequest(GET_PRODUCTS_QUERY, { limit: 100 })
+        const fetchedList = data?.products?.products
+        if (Array.isArray(fetchedList) && fetchedList.length > 0) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('gocart_cached_products', JSON.stringify(fetchedList))
+          }
+          dispatch(setProduct(fetchedList))
+        } else {
+          dispatch(setProductLoading(false))
+        }
+      } catch (err) {
+        console.warn('Could not load products from backend:', err)
+        dispatch(setProductLoading(false))
+      }
+    }
+
+    loadProducts()
+  }, [dispatch])
+
+  return null
+}
+
+function CurrencyInitializer() {
+  const dispatch = useDispatch()
+  const hasInitializedRef = useRef(false)
+
+  useEffect(() => {
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
+
+    if (typeof window === 'undefined') return
+
+    // 1. Check if user already chose currency manually
+    const savedCurrency = localStorage.getItem('gocart_currency')
+    if (savedCurrency && CURRENCIES[savedCurrency]) {
+      dispatch(setCurrency({ code: savedCurrency, isManual: true }))
+      return
+    }
+
+    // 2. Synchronous location detection via browser timezone & locale
+    const detected = detectCurrencyCodeFromEnv()
+    dispatch(setCurrency({ code: detected, isManual: false }))
+
+    // 3. Asynchronous refinement via GeoIP
+    const checkGeoLocation = async () => {
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 2500)
+        const res = await fetch('https://get.geojs.io/v1/ip/country.json', {
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+        if (res.ok) {
+          const data = await res.json()
+          const countryCode = data?.country?.toUpperCase()
+          if (countryCode && COUNTRY_TO_CURRENCY[countryCode]) {
+            const targetCurrency = COUNTRY_TO_CURRENCY[countryCode]
+            if (!localStorage.getItem('gocart_currency')) {
+              dispatch(setCurrency({ code: targetCurrency, isManual: false }))
+            }
+          }
+        }
+      } catch {
+        // Fallback to timezone detection already applied
+      }
+    }
+
+    checkGeoLocation()
+  }, [dispatch])
+
+  return null
+}
+
 export default function StoreProvider({ children }) {
   const storeRef = useRef(undefined)
   if (!storeRef.current) {
@@ -168,6 +267,8 @@ export default function StoreProvider({ children }) {
   return (
     <Provider store={storeRef.current}>
       <AuthInitializer />
+      <ProductInitializer />
+      <CurrencyInitializer />
       {children}
     </Provider>
   )

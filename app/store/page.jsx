@@ -21,9 +21,10 @@ import { useStore } from "@/components/store/StoreLayout"
 import DraftStoreReviewCard from "@/components/store/DraftStoreReviewCard"
 import { graphqlRequest } from "@/lib/apiClient"
 import { GET_PRODUCTS_QUERY } from "@/lib/graphql/product"
+import { useCurrency } from "@/lib/features/currency/useCurrency"
 
 export default function Dashboard() {
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
+    const { formatPrice } = useCurrency()
     const router = useRouter()
     const { storeInfo, setStoreInfo, submittingStatus, submitDraftStore } = useStore()
 
@@ -89,7 +90,7 @@ export default function Dashboard() {
 
     const dashboardCardsData = [
         { title: 'Total Products', value: dashboardData.totalProducts, icon: ShoppingBasketIcon },
-        { title: 'Total Earnings', value: currency + dashboardData.totalEarnings.toFixed(2), icon: CircleDollarSignIcon },
+        { title: 'Total Earnings', value: formatPrice(dashboardData.totalEarnings), icon: CircleDollarSignIcon },
         { title: 'Total Orders', value: dashboardData.totalOrders, icon: TagsIcon },
         { title: 'Total Ratings', value: dashboardData.ratings.length, icon: StarIcon },
     ]

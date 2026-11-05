@@ -3,19 +3,21 @@
 import { useEffect, useState } from "react"
 import { toast } from "react-hot-toast"
 import Link from "next/link"
-import { Plus, Package, RefreshCw, AlertCircle, PlusCircle } from "lucide-react"
+import { Plus, Package, RefreshCw, PlusCircle, Trash2, ExternalLink } from "lucide-react"
 import Loading from "@/components/Loading"
 import { graphqlRequest } from "@/lib/apiClient"
-import { GET_PRODUCTS_QUERY } from "@/lib/graphql/product"
+import { GET_PRODUCTS_QUERY, UPDATE_PRODUCT_MUTATION, DELETE_PRODUCT_MUTATION } from "@/lib/graphql/product"
 import { useStore } from "@/components/store/StoreLayout"
+import { useCurrency } from "@/lib/features/currency/useCurrency"
 
 export default function StoreManageProducts() {
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
+    const { formatPrice } = useCurrency()
     const { storeInfo } = useStore()
 
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
     const [products, setProducts] = useState([])
+    const [deletingId, setDeletingId] = useState(null)
 
     const fetchProducts = async () => {
         if (!storeInfo?.id) {
@@ -30,7 +32,9 @@ export default function StoreManageProducts() {
                 limit: 100
             })
             if (data?.products?.products) {
-                setProducts(data.products.products)
+                // Filter out soft-deleted products
+                const activeProducts = data.products.products.filter(p => !p.deletedAt)
+                setProducts(activeProducts)
             } else {
                 setProducts([])
             }
@@ -49,14 +53,55 @@ export default function StoreManageProducts() {
     }
 
     const toggleStock = async (productId) => {
+        const product = products.find(p => p.id === productId)
+        if (!product) return
+
+        const currentInStock = product.status === 'IN_STOCK' || product.status === 'PUBLISHED' || product.inStock !== false
+        const nextStatus = currentInStock ? 'OUT_OF_STOCK' : 'IN_STOCK'
+
+        // Optimistic UI update
         setProducts(prev => prev.map(p => {
             if (p.id === productId) {
-                const updatedStock = !p.inStock
-                return { ...p, inStock: updatedStock }
+                return { ...p, status: nextStatus, inStock: !currentInStock }
             }
             return p
         }))
-        toast.success("Product availability updated")
+
+        try {
+            await graphqlRequest(UPDATE_PRODUCT_MUTATION, {
+                id: productId,
+                input: { status: nextStatus }
+            })
+            toast.success(`Product marked as ${nextStatus === 'IN_STOCK' ? 'in stock' : 'out of stock'}`)
+        } catch (err) {
+            console.error("Failed to update product stock:", err)
+            // Revert on error
+            setProducts(prev => prev.map(p => {
+                if (p.id === productId) {
+                    return { ...p, status: product.status, inStock: currentInStock }
+                }
+                return p
+            }))
+            toast.error(err.message || "Failed to update product status on server")
+        }
+    }
+
+    const handleDeleteProduct = async (productId, productName) => {
+        if (!confirm(`Are you sure you want to delete "${productName}"? This action cannot be undone.`)) {
+            return
+        }
+
+        setDeletingId(productId)
+        try {
+            await graphqlRequest(DELETE_PRODUCT_MUTATION, { id: productId })
+            setProducts(prev => prev.filter(p => p.id !== productId))
+            toast.success(`Product "${productName}" deleted successfully`)
+        } catch (err) {
+            console.error("Failed to delete product:", err)
+            toast.error(err.message || "Failed to delete product from server")
+        } finally {
+            setDeletingId(null)
+        }
     }
 
     useEffect(() => {
@@ -82,14 +127,14 @@ export default function StoreManageProducts() {
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                        className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                         title="Refresh catalog"
                     >
                         <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
                     </button>
                     <Link
                         href="/store/add-product"
-                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition shadow-sm"
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition shadow-sm cursor-pointer"
                     >
                         <Plus size={16} /> Add Product
                     </Link>
@@ -110,7 +155,7 @@ export default function StoreManageProducts() {
                     <div className="pt-2">
                         <Link
                             href="/store/add-product"
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm shadow-md transition active:scale-95"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm shadow-md transition active:scale-95 cursor-pointer"
                         >
                             <PlusCircle size={16} /> Add Your First Product
                         </Link>
@@ -127,7 +172,8 @@ export default function StoreManageProducts() {
                                     <th className="px-4 py-3.5 hidden sm:table-cell">Status</th>
                                     <th className="px-4 py-3.5">MRP</th>
                                     <th className="px-4 py-3.5">Offer Price</th>
-                                    <th className="px-4 py-3.5 text-center">Status</th>
+                                    <th className="px-4 py-3.5 text-center">In Stock</th>
+                                    <th className="px-4 py-3.5 text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -171,10 +217,10 @@ export default function StoreManageProducts() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-4 text-slate-400 line-through text-xs">
-                                                {currency} {Number(product.mrp || 0).toFixed(2)}
+                                                {formatPrice(product.mrp)}
                                             </td>
                                             <td className="px-4 py-4 font-semibold text-slate-900">
-                                                {currency} {Number(product.price || 0).toFixed(2)}
+                                                {formatPrice(product.price)}
                                             </td>
                                             <td className="px-4 py-4 text-center">
                                                 <label className="relative inline-flex items-center cursor-pointer text-gray-900">
@@ -187,6 +233,26 @@ export default function StoreManageProducts() {
                                                     <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-emerald-600 transition-colors duration-200"></div>
                                                     <span className="dot absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-4"></span>
                                                 </label>
+                                            </td>
+                                            <td className="px-4 py-4 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <Link
+                                                        href={`/product/${product.id}`}
+                                                        target="_blank"
+                                                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                                                        title="View on store"
+                                                    >
+                                                        <ExternalLink size={15} />
+                                                    </Link>
+                                                    <button
+                                                        onClick={() => handleDeleteProduct(product.id, product.name)}
+                                                        disabled={deletingId === product.id}
+                                                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer disabled:opacity-50"
+                                                        title="Delete product"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     )

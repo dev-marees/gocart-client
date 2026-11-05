@@ -8,10 +8,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { assets } from "@/assets/assets";
+import { useCurrency } from "@/lib/features/currency/useCurrency";
 
 export default function Cart() {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
+    const { formatPrice } = useCurrency();
 
     const { cartItems } = useSelector(state => state.cart);
     const { isAuthenticated } = useSelector(state => state.auth);
@@ -26,7 +28,7 @@ export default function Cart() {
         setTotalPrice(0);
         const cartArray = [];
         for (const [key, value] of Object.entries(cartItems)) {
-            const product = products.find(product => product.id === key);
+            const product = products.find(product => String(product.id) === String(key));
             if (product) {
                 cartArray.push({
                     ...product,
@@ -93,18 +95,18 @@ export default function Cart() {
                                     <tr key={index} className="space-x-2">
                                         <td className="flex gap-3 my-4">
                                             <div className="flex gap-3 items-center justify-center bg-slate-100 size-18 rounded-md">
-                                                <Image src={item.images[0]} className="h-14 w-auto" alt="" width={45} height={45} />
+                                                <Image src={(Array.isArray(item.images) && item.images[0]) || item.imageUrl || assets.product_img1} className="h-14 w-auto object-contain" alt={item.name || ""} width={45} height={45} unoptimized />
                                             </div>
                                             <div>
                                                 <p className="max-sm:text-sm">{item.name}</p>
                                                 <p className="text-xs text-slate-500">{item.category}</p>
-                                                <p>{currency}{item.price}</p>
+                                                <p className="text-slate-700 font-medium">{formatPrice(item.price)}</p>
                                             </div>
                                         </td>
                                         <td className="text-center">
                                             <Counter productId={item.id} />
                                         </td>
-                                        <td className="text-center">{currency}{(item.price * item.quantity).toLocaleString()}</td>
+                                        <td className="text-center">{formatPrice(item.price * item.quantity)}</td>
                                         <td className="text-center max-md:hidden">
                                             <button onClick={() => handleDeleteItemFromCart(item.id)} className=" text-red-500 hover:bg-red-50 p-2.5 rounded-full active:scale-95 transition-all cursor-pointer">
                                                 <Trash2Icon size={18} />

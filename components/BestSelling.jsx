@@ -7,14 +7,21 @@ const BestSelling = () => {
 
     const displayQuantity = 8
     const products = useSelector(state => state.product.list)
+    const loading = useSelector(state => state.product.loading)
 
     return (
         <div className='px-6 my-30 max-w-6xl mx-auto'>
             <Title title='Best Selling' description={`Showing ${products.length < displayQuantity ? products.length : displayQuantity} of ${products.length} products`} href='/shop' />
-            <div className='mt-12  grid grid-cols-2 sm:flex flex-wrap gap-6 xl:gap-12'>
-                {products.slice().sort((a, b) => b.rating.length - a.rating.length).slice(0, displayQuantity).map((product, index) => (
-                    <ProductCard key={index} product={product} />
-                ))}
+            <div className='mt-12 grid grid-cols-2 sm:flex flex-wrap gap-6 xl:gap-12'>
+                {products.length === 0 && loading ? (
+                    Array(4).fill(0).map((_, i) => (
+                        <div key={i} className='bg-slate-100 rounded-lg h-40 sm:w-60 sm:h-68 animate-pulse' />
+                    ))
+                ) : (
+                    products.slice().sort((a, b) => (b.rating?.length || b.avgRating || 0) - (a.rating?.length || a.avgRating || 0)).slice(0, displayQuantity).map((product, index) => (
+                        <ProductCard key={product.id || index} product={product} />
+                    ))
+                )}
             </div>
         </div>
     )

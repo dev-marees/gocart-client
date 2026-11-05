@@ -7,10 +7,11 @@ import { useRouter } from 'next/navigation';
 import { graphqlRequest } from '@/lib/apiClient';
 import { GET_USER_ADDRESSES_QUERY } from '@/lib/graphql/address';
 import { setAddresses, normalizeAddress } from '@/lib/features/address/addressSlice';
+import { useCurrency } from '@/lib/features/currency/useCurrency';
 
 const OrderSummary = ({ totalPrice, items }) => {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
+    const { formatPrice } = useCurrency();
 
     const router = useRouter();
     const dispatch = useDispatch();
@@ -163,7 +164,7 @@ const OrderSummary = ({ totalPrice, items }) => {
             <div className='pb-4 border-b border-slate-100 space-y-2 text-xs'>
                 <div className='flex justify-between text-slate-500'>
                     <span>Subtotal:</span>
-                    <span className='font-semibold text-slate-700'>{currency}{totalPrice.toLocaleString()}</span>
+                    <span className='font-semibold text-slate-700'>{formatPrice(totalPrice)}</span>
                 </div>
                 <div className='flex justify-between text-slate-500'>
                     <span>Estimated Shipping:</span>
@@ -172,7 +173,7 @@ const OrderSummary = ({ totalPrice, items }) => {
                 {coupon && (
                     <div className='flex justify-between text-green-600 font-medium'>
                         <span>Coupon ({coupon.code}):</span>
-                        <span>{`-${currency}${(coupon.discount / 100 * totalPrice).toFixed(2)}`}</span>
+                        <span>{`-${formatPrice((coupon.discount / 100 * totalPrice))}`}</span>
                     </div>
                 )}
 
@@ -205,7 +206,7 @@ const OrderSummary = ({ totalPrice, items }) => {
             <div className='flex items-baseline justify-between py-4'>
                 <span className='text-sm font-semibold text-slate-700'>Total Amount:</span>
                 <span className='text-xl font-bold text-slate-900'>
-                    {currency}{coupon ? (totalPrice - (coupon.discount / 100 * totalPrice)).toFixed(2) : totalPrice.toLocaleString()}
+                    {formatPrice(coupon ? (totalPrice - (coupon.discount / 100 * totalPrice)) : totalPrice)}
                 </span>
             </div>
 

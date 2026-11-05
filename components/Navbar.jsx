@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "@/lib/features/auth/authSlice";
+import CurrencySelector from "./CurrencySelector";
 
 const Navbar = () => {
 
@@ -69,6 +70,8 @@ const Navbar = () => {
                                 <Truck size={14} /> Delivery Hub
                             </Link>
                         )}
+                        <CurrencySelector />
+
                         {/* Auth Buttons */}
                         {isAuthenticated ? (
                             <div className="flex items-center gap-3">

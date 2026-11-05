@@ -187,76 +187,74 @@ export default function ProfilePage() {
                     ? new Date(me.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                     : ''
 
-                setProfileData(prev => {
-                    const cached = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {}
-                    const dedicatedAvatar = effectiveUserId && typeof window !== 'undefined' ? localStorage.getItem(`user_avatar_${effectiveUserId}`) : null
-                    const preservedAvatar = me.avatarUrl || prev.avatar || cached.avatarUrl || cached.avatar || dedicatedAvatar || null
+                const cached = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {}
+                const dedicatedAvatar = effectiveUserId && typeof window !== 'undefined' ? localStorage.getItem(`user_avatar_${effectiveUserId}`) : null
+                const preservedAvatar = me.avatarUrl || profileData.avatar || cached.avatarUrl || cached.avatar || dedicatedAvatar || null
+                const fullName = `${me.firstName || ''} ${me.lastName || ''}`.trim()
 
-                    if (typeof window !== 'undefined') {
-                        const fullName = `${me.firstName || ''} ${me.lastName || ''}`.trim()
-                        const updatedUser = {
-                            ...cached,
-                            ...me,
-                            name: fullName || me.username || cached.name || me.email?.split('@')[0] || 'User',
-                            firstName: me.firstName || cached.firstName || '',
-                            lastName: me.lastName || cached.lastName || '',
-                            avatar: preservedAvatar,
-                            avatarUrl: preservedAvatar
-                        }
-                        localStorage.setItem('user', JSON.stringify(updatedUser))
-                        dispatch(setAuth({ user: updatedUser, token }))
-                    }
+                const updatedUser = {
+                    ...cached,
+                    ...me,
+                    name: fullName || me.username || cached.name || me.email?.split('@')[0] || 'User',
+                    firstName: me.firstName || cached.firstName || '',
+                    lastName: me.lastName || cached.lastName || '',
+                    avatar: preservedAvatar,
+                    avatarUrl: preservedAvatar
+                }
 
-                    return {
-                        firstName: me.firstName || prev.firstName || '',
-                        lastName: me.lastName || prev.lastName || '',
-                        email: me.email || prev.email || '',
-                        phone: me.phone || prev.phone || '',
-                        gender: me.gender === 'female' || me.gender === 'others' ? me.gender : (prev.gender || 'male'),
-                        dob: formattedDob || prev.dob || '',
-                        bio: me.bio || prev.bio || '',
-                        avatar: preservedAvatar,
-                        memberSince: formattedDate || prev.memberSince || ''
-                    }
-                })
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('user', JSON.stringify(updatedUser))
+                }
+                dispatch(setAuth({ user: updatedUser, token }))
+
+                setProfileData(prev => ({
+                    firstName: me.firstName || prev.firstName || '',
+                    lastName: me.lastName || prev.lastName || '',
+                    email: me.email || prev.email || '',
+                    phone: me.phone || prev.phone || '',
+                    gender: me.gender === 'female' || me.gender === 'others' ? me.gender : (prev.gender || 'male'),
+                    dob: formattedDob || prev.dob || '',
+                    bio: me.bio || prev.bio || '',
+                    avatar: preservedAvatar,
+                    memberSince: formattedDate || prev.memberSince || ''
+                }))
             } else if (effectiveUserId) {
                 const userRes = await graphqlRequest(GET_USER_QUERY, { id: effectiveUserId })
                 const u = userRes?.user
                 if (u) {
-                    setProfileData(prev => {
-                        const cached = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {}
-                        const dedicatedAvatar = effectiveUserId && typeof window !== 'undefined' ? localStorage.getItem(`user_avatar_${effectiveUserId}`) : null
-                        const preservedAvatar = u.avatarUrl || prev.avatar || cached.avatarUrl || cached.avatar || dedicatedAvatar || null
+                    const cached = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {}
+                    const dedicatedAvatar = effectiveUserId && typeof window !== 'undefined' ? localStorage.getItem(`user_avatar_${effectiveUserId}`) : null
+                    const preservedAvatar = u.avatarUrl || profileData.avatar || cached.avatarUrl || cached.avatar || dedicatedAvatar || null
+                    const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim()
 
-                        if (typeof window !== 'undefined') {
-                            const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim()
-                            const updatedUser = {
-                                ...cached,
-                                ...u,
-                                name: fullName || u.username || cached.name || u.email?.split('@')[0] || 'User',
-                                firstName: u.firstName || cached.firstName || '',
-                                lastName: u.lastName || cached.lastName || '',
-                                avatar: preservedAvatar,
-                                avatarUrl: preservedAvatar
-                            }
-                            localStorage.setItem('user', JSON.stringify(updatedUser))
-                            dispatch(setAuth({ user: updatedUser, token }))
-                        }
+                    const updatedUser = {
+                        ...cached,
+                        ...u,
+                        name: fullName || u.username || cached.name || u.email?.split('@')[0] || 'User',
+                        firstName: u.firstName || cached.firstName || '',
+                        lastName: u.lastName || cached.lastName || '',
+                        avatar: preservedAvatar,
+                        avatarUrl: preservedAvatar
+                    }
 
-                        return {
-                            firstName: u.firstName || prev.firstName || '',
-                            lastName: u.lastName || prev.lastName || '',
-                            email: u.email || prev.email || '',
-                            phone: u.phone || prev.phone || '',
-                            gender: u.gender === 'female' || u.gender === 'others' ? u.gender : (prev.gender || 'male'),
-                            dob: (u.dateOfBirth || '').split('T')[0] || prev.dob || '',
-                            bio: u.bio || prev.bio || '',
-                            avatar: preservedAvatar,
-                            memberSince: u.createdAt
-                                ? new Date(u.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                                : (prev.memberSince || '')
-                        }
-                    })
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('user', JSON.stringify(updatedUser))
+                    }
+                    dispatch(setAuth({ user: updatedUser, token }))
+
+                    setProfileData(prev => ({
+                        firstName: u.firstName || prev.firstName || '',
+                        lastName: u.lastName || prev.lastName || '',
+                        email: u.email || prev.email || '',
+                        phone: u.phone || prev.phone || '',
+                        gender: u.gender === 'female' || u.gender === 'others' ? u.gender : (prev.gender || 'male'),
+                        dob: (u.dateOfBirth || '').split('T')[0] || prev.dob || '',
+                        bio: u.bio || prev.bio || '',
+                        avatar: preservedAvatar,
+                        memberSince: u.createdAt
+                            ? new Date(u.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                            : (prev.memberSince || '')
+                    }))
                 }
             }
         } catch (err) {

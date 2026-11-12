@@ -63,12 +63,22 @@ function AuthInitializer() {
         const refreshedToken = await refreshAuthToken()
         if (refreshedToken) {
           token = refreshedToken
+        } else {
+          token = null
         }
       } else if (!token && refreshToken) {
         const refreshedToken = await refreshAuthToken()
         if (refreshedToken) {
           token = refreshedToken
         }
+      } else if (token && isTokenExpired(token) && !refreshToken) {
+        // Token is expired and cannot be refreshed - clean up upfront
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          document.cookie = 'token=; Max-Age=0; path=/;'
+        }
+        token = null
       }
 
       if (token) {
@@ -149,6 +159,16 @@ function AuthInitializer() {
           })
           .catch((err) => {
             console.warn('AuthInitializer profile fetch notice:', err)
+            const isAuthErr = /expired|unauthorized|invalid token|unauthenticated|authentication required|not authenticated/i.test(err?.message || '')
+            if (isAuthErr) {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('token')
+                localStorage.removeItem('refreshToken')
+                localStorage.removeItem('user')
+                document.cookie = 'token=; Max-Age=0; path=/;'
+              }
+              dispatch(setAuth({ user: null, token: null }))
+            }
           })
       } else {
         dispatch(setLoading(false))

@@ -25,11 +25,13 @@ const ProductDetails = ({ product }) => {
         : (product?.imageUrl ? [product.imageUrl] : [assets.product_img1])
 
     const [mainImage, setMainImage] = useState(images[0])
+    const [mainLoaded, setMainLoaded] = useState(false)
     const [selectedVariant, setSelectedVariant] = useState(product?.variants?.[0] || null)
 
     useEffect(() => {
         if (images.length > 0) {
             setMainImage(images[0])
+            setMainLoaded(false)
         }
         if (product?.variants?.length > 0) {
             setSelectedVariant(product.variants[0])
@@ -83,7 +85,7 @@ const ProductDetails = ({ product }) => {
                     {images.map((image, index) => (
                         <div
                             key={index}
-                            onClick={() => setMainImage(image)}
+                            onClick={() => { setMainImage(image); setMainLoaded(false) }}
                             className={`bg-slate-100 flex items-center justify-center size-24 rounded-lg group cursor-pointer border-2 transition ${
                                 mainImage === image ? 'border-green-600 shadow-sm' : 'border-transparent hover:border-slate-300'
                             }`}
@@ -99,14 +101,23 @@ const ProductDetails = ({ product }) => {
                         </div>
                     ))}
                 </div>
-                <div className="flex justify-center items-center h-100 sm:size-113 bg-slate-100 rounded-lg p-6 overflow-hidden">
+                <div className="relative flex justify-center items-center h-100 sm:size-113 bg-slate-100 rounded-lg p-6 overflow-hidden">
+                    {/* Shimmer shown while main image loads */}
+                    {!mainLoaded && (
+                        <div className="absolute inset-0 rounded-lg overflow-hidden">
+                            <div className="w-full h-full bg-slate-200 relative overflow-hidden">
+                                <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+                            </div>
+                        </div>
+                    )}
                     <Image
                         src={mainImage || assets.product_img1}
                         alt={product.name || "Product"}
                         width={350}
                         height={350}
                         unoptimized
-                        className="object-contain max-h-[350px] w-auto transition-transform duration-300 hover:scale-105"
+                        onLoad={() => setMainLoaded(true)}
+                        className={`object-contain max-h-[350px] w-auto hover:scale-105 transition-[transform,opacity] duration-300 ${mainLoaded ? 'opacity-100 animate-[img-fade_0.4s_ease-out]' : 'opacity-0'}`}
                     />
                 </div>
             </div>

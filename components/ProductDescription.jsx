@@ -8,6 +8,7 @@ import { assets } from "@/assets/assets"
 
 const ProductDescription = ({ product }) => {
     const [selectedTab, setSelectedTab] = useState('Description')
+    const [storeLogoLoaded, setStoreLogoLoaded] = useState(false)
 
     const ratings = Array.isArray(product?.rating) ? product.rating : []
     const store = product?.store || {}
@@ -52,7 +53,7 @@ const ProductDescription = ({ product }) => {
                                         <Image
                                             src={item.user.image}
                                             alt={item.user.name || "User"}
-                                            className="w-full h-full object-cover"
+                                            className="w-full h-full object-cover animate-[img-fade_0.4s_ease-out]"
                                             width={40}
                                             height={40}
                                             unoptimized
@@ -89,15 +90,21 @@ const ProductDescription = ({ product }) => {
 
             {/* Store Information */}
             <div className="flex items-center gap-3.5 mt-12 p-4 rounded-2xl bg-white border border-slate-200/80 max-w-md shadow-xs">
-                <div className="size-12 rounded-xl overflow-hidden ring-1 ring-slate-200 shrink-0">
+                <div className="size-12 rounded-xl overflow-hidden ring-1 ring-slate-200 shrink-0 relative bg-slate-100">
                     <Image
                         src={storeLogo}
                         alt={storeName}
-                        className="w-full h-full object-cover"
+                        className={`w-full h-full object-cover transition-opacity duration-300 ${storeLogoLoaded ? 'opacity-100 animate-[img-fade_0.4s_ease-out]' : 'opacity-0'}`}
                         width={48}
                         height={48}
                         unoptimized
+                        onLoad={() => setStoreLogoLoaded(true)}
                     />
+                    {!storeLogoLoaded && (
+                        <div className="absolute inset-0 bg-slate-200 overflow-hidden">
+                            <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+                        </div>
+                    )}
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-xs text-slate-400 font-medium">Sold by</p>

@@ -21,13 +21,14 @@ const OrderItem = ({ order }) => {
                     <div className="flex flex-col gap-6">
                         {order.orderItems.map((item, index) => (
                             <div key={index} className="flex items-center gap-4">
-                                <div className="w-20 aspect-square bg-slate-100 flex items-center justify-center rounded-md">
+                                <div className="w-20 aspect-square bg-slate-100 flex items-center justify-center rounded-md overflow-hidden">
                                     <Image
-                                        className="h-14 w-auto"
+                                        className="h-14 w-auto animate-[img-fade_0.4s_ease-out]"
                                         src={item.product.images[0]}
                                         alt="product_img"
                                         width={50}
                                         height={50}
+                                        unoptimized
                                     />
                                 </div>
                                 <div className="flex flex-col justify-center text-sm">

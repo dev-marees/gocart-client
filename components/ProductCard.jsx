@@ -3,12 +3,13 @@
 import { StarIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
+import React, { useState } from 'react'
 import { assets } from '@/assets/assets'
 import { useCurrency } from '@/lib/features/currency/useCurrency'
 
 const ProductCard = ({ product }) => {
     const { formatPrice } = useCurrency()
+    const [loaded, setLoaded] = useState(false)
 
     // Calculate rating safely
     const rating = typeof product?.avgRating === 'number' && product.avgRating > 0
@@ -22,12 +23,21 @@ const ProductCard = ({ product }) => {
 
     return (
         <Link href={`/product/${product.id}`} className='group max-xl:mx-auto block'>
-            <div className='bg-[#F5F5F5] h-40 sm:w-60 sm:h-68 rounded-lg flex items-center justify-center p-3 overflow-hidden'>
+            <div className='relative bg-[#F5F5F5] h-40 sm:w-60 sm:h-68 rounded-lg flex items-center justify-center p-3 overflow-hidden'>
+                {/* Shimmer placeholder */}
+                {!loaded && (
+                    <div className='absolute inset-0 rounded-lg overflow-hidden'>
+                        <div className='w-full h-full bg-slate-200 relative overflow-hidden'>
+                            <div className='absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent' />
+                        </div>
+                    </div>
+                )}
                 <Image
                     width={500}
                     height={500}
                     unoptimized
-                    className='max-h-30 sm:max-h-40 w-auto object-contain group-hover:scale-110 transition duration-300'
+                    onLoad={() => setLoaded(true)}
+                    className={`max-h-30 sm:max-h-40 w-auto object-contain group-hover:scale-110 transition-[transform,opacity] duration-300 ${loaded ? 'opacity-100 animate-[img-fade_0.4s_ease-out]' : 'opacity-0'}`}
                     src={imageSrc}
                     alt={product.name || "Product"}
                 />

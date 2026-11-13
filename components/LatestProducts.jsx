@@ -2,6 +2,7 @@
 import React from 'react'
 import Title from './Title'
 import ProductCard from './ProductCard'
+import ProductCardSkeleton from './ProductCardSkeleton'
 import { useSelector } from 'react-redux'
 
 const LatestProducts = () => {
@@ -16,7 +17,7 @@ const LatestProducts = () => {
             <div className='mt-12 grid grid-cols-2 sm:flex flex-wrap gap-6 justify-between'>
                 {products.length === 0 && loading ? (
                     Array(4).fill(0).map((_, i) => (
-                        <div key={i} className='bg-slate-100 rounded-lg h-40 sm:w-60 sm:h-68 animate-pulse' />
+                        <ProductCardSkeleton key={i} />
                     ))
                 ) : (
                     products.slice().sort((a, b) => (new Date(b.createdAt || 0).getTime() || 0) - (new Date(a.createdAt || 0).getTime() || 0)).slice(0, displayQuantity).map((product, index) => (

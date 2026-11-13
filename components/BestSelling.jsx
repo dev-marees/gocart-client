@@ -1,6 +1,7 @@
 'use client'
 import Title from './Title'
 import ProductCard from './ProductCard'
+import ProductCardSkeleton from './ProductCardSkeleton'
 import { useSelector } from 'react-redux'
 
 const BestSelling = () => {
@@ -15,7 +16,7 @@ const BestSelling = () => {
             <div className='mt-12 grid grid-cols-2 sm:flex flex-wrap gap-6 xl:gap-12'>
                 {products.length === 0 && loading ? (
                     Array(4).fill(0).map((_, i) => (
-                        <div key={i} className='bg-slate-100 rounded-lg h-40 sm:w-60 sm:h-68 animate-pulse' />
+                        <ProductCardSkeleton key={i} />
                     ))
                 ) : (
                     products.slice().sort((a, b) => (b.rating?.length || b.avgRating || 0) - (a.rating?.length || a.avgRating || 0)).slice(0, displayQuantity).map((product, index) => (

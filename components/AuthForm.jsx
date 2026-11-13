@@ -34,6 +34,7 @@ import {
     RESEND_VERIFICATION_EMAIL_MUTATION
 } from '@/lib/graphql/auth'
 import { GET_ME_QUERY } from '@/lib/graphql/user'
+import { getGoogleOAuthURL } from '@/lib/googleAuth'
 
 const ROLE_CONFIGS = {
     USER: {
@@ -156,6 +157,18 @@ function AuthFormInner({
             ...prev,
             [name]: type === 'checkbox' ? checked : value,
         }))
+    }
+
+    const handleGoogleSignIn = () => {
+        try {
+            const url = getGoogleOAuthURL({
+                role: currentRole,
+                mode: authMode === 'register' ? 'register' : 'login',
+            })
+            window.location.href = url
+        } catch (err) {
+            toast.error(err?.message || 'Could not initiate Google sign-in')
+        }
     }
 
     // Handles storing session data and redirecting user
@@ -614,7 +627,8 @@ function AuthFormInner({
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <button
                                             type="button"
-                                            className="flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition shadow-sm active:scale-98"
+                                            onClick={handleGoogleSignIn}
+                                            className="flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition shadow-sm active:scale-98 cursor-pointer"
                                         >
                                             <svg className="w-4 h-4" viewBox="0 0 24 24">
                                                 <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.3 8.9 5 12 5z" />

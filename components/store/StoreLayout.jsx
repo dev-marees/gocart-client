@@ -20,6 +20,7 @@ import { GET_USER_STORE_QUERY, SUBMIT_STORE_MUTATION } from "@/lib/graphql/store
 import toast from "react-hot-toast"
 import { useDispatch } from "react-redux"
 import { logout } from "@/lib/features/auth/authSlice"
+import { LOGOUT_MUTATION } from "@/lib/graphql/auth"
 
 export const StoreContext = createContext({
     storeInfo: null,
@@ -141,10 +142,16 @@ const StoreLayout = ({ children }) => {
         }
     }
 
-    const handleLogout = () => {
-        dispatch(logout())
-        toast.success("Logged out")
-        router.push("/merchant/login")
+    const handleLogout = async () => {
+        try {
+            await graphqlRequest(LOGOUT_MUTATION)
+        } catch (err) {
+            console.warn('Backend logout notice:', err)
+        } finally {
+            dispatch(logout())
+            toast.success("Logged out")
+            router.push("/merchant/login")
+        }
     }
 
     useEffect(() => {

@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation"
 import { useSelector, useDispatch } from "react-redux"
 import { LogOut, User, Store, ExternalLink } from "lucide-react"
 import { logout } from "@/lib/features/auth/authSlice"
+import { graphqlRequest } from "@/lib/apiClient"
+import { LOGOUT_MUTATION } from "@/lib/graphql/auth"
 import toast from "react-hot-toast"
 
 const StoreNavbar = ({ storeInfo }) => {
@@ -11,10 +13,16 @@ const StoreNavbar = ({ storeInfo }) => {
     const dispatch = useDispatch()
     const user = useSelector((state) => state.auth.user)
 
-    const handleLogout = () => {
-        dispatch(logout())
-        toast.success("Signed out of merchant portal")
-        router.push("/merchant/login")
+    const handleLogout = async () => {
+        try {
+            await graphqlRequest(LOGOUT_MUTATION)
+        } catch (err) {
+            console.warn('Backend logout notice:', err)
+        } finally {
+            dispatch(logout())
+            toast.success("Signed out of merchant portal")
+            router.push("/merchant/login")
+        }
     }
 
     const approvalStatus = storeInfo?.approvalStatus || 'DRAFT'

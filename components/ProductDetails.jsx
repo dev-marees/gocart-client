@@ -1,6 +1,6 @@
 'use client'
 
-import { addToCart } from "@/lib/features/cart/cartSlice"
+import { addToCart, setCart } from "@/lib/features/cart/cartSlice"
 import { StarIcon, TagIcon, EarthIcon, CreditCardIcon, UserIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
@@ -10,6 +10,8 @@ import { useDispatch, useSelector } from "react-redux"
 import toast from "react-hot-toast"
 import { assets } from "@/assets/assets"
 import { useCurrency } from "@/lib/features/currency/useCurrency"
+import { graphqlRequest } from "@/lib/apiClient"
+import { ADD_TO_CART_MUTATION } from "@/lib/graphql/cart"
 
 const ProductDetails = ({ product }) => {
     const productId = product.id
@@ -50,7 +52,7 @@ const ProductDetails = ({ product }) => {
         }
     }, [isAuthenticated, productId, dispatch])
 
-    const addToCartHandler = () => {
+    const addToCartHandler = async () => {
         if (!isAuthenticated) {
             if (typeof window !== 'undefined') {
                 localStorage.setItem('pendingCartItem', productId)
@@ -61,6 +63,20 @@ const ProductDetails = ({ product }) => {
         }
         dispatch(addToCart({ productId }))
         toast.success('Added to cart')
+
+        try {
+            const res = await graphqlRequest(ADD_TO_CART_MUTATION, {
+                input: {
+                    productId: String(productId),
+                    quantity: 1,
+                },
+            })
+            if (res?.addToCart) {
+                dispatch(setCart(res.addToCart))
+            }
+        } catch (err) {
+            console.warn('Backend addToCart notice:', err)
+        }
     }
 
     const averageRating = typeof product?.avgRating === 'number' && product.avgRating > 0

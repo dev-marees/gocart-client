@@ -31,7 +31,9 @@ import {
     LOGIN_MUTATION,
     REGISTER_MUTATION,
     VERIFY_EMAIL_MUTATION,
-    RESEND_VERIFICATION_EMAIL_MUTATION
+    RESEND_VERIFICATION_EMAIL_MUTATION,
+    FORGOT_PASSWORD_MUTATION,
+    RESET_PASSWORD_WITH_OTP_MUTATION,
 } from '@/lib/graphql/auth'
 import { GET_ME_QUERY } from '@/lib/graphql/user'
 import { getGoogleOAuthURL } from '@/lib/googleAuth'
@@ -106,7 +108,7 @@ function AuthFormInner({
     const config = ROLE_CONFIGS[role] || ROLE_CONFIGS.USER
     const BadgeIcon = config.badgeIcon
 
-    const [authMode, setAuthMode] = useState('login') // 'login' | 'register' | 'forgot' | 'verify-email'
+    const [authMode, setAuthMode] = useState('login') // 'login' | 'register' | 'forgot' | 'reset-password' | 'verify-email'
     const [currentRole, setCurrentRole] = useState(role)
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -117,6 +119,12 @@ function AuthFormInner({
     const [otp, setOtp] = useState('')
     const [resendCooldown, setResendCooldown] = useState(0)
     const [resending, setResending] = useState(false)
+
+    // Password reset state
+    const [resetOtp, setResetOtp] = useState('')
+    const [resetPassword, setResetPassword] = useState('')
+    const [resetConfirmPassword, setResetConfirmPassword] = useState('')
+    const [showResetPassword, setShowResetPassword] = useState(false)
 
     useEffect(() => {
         if (!lockRole) {
@@ -284,7 +292,7 @@ function AuthFormInner({
         }
     }
 
-    // Handles form submit for login and register
+    // Handles form submit for login, register, forgot, and reset-password
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLoading(true)
@@ -299,7 +307,7 @@ function AuthFormInner({
                     },
                 })
                 handleAuthSuccess(response.login)
-            } else {
+            } else if (authMode === 'register') {
                 if (formData.password !== formData.confirmPassword) {
                     throw new Error("Passwords don't match")
                 }
@@ -316,6 +324,52 @@ function AuthFormInner({
                 toast.success('Account created! A verification code has been sent to your email.')
                 setAuthMode('verify-email')
                 setResendCooldown(60)
+            } else if (authMode === 'forgot') {
+                if (!formData.email || !formData.email.trim()) {
+                    throw new Error('Please enter your email address')
+                }
+                const res = await graphqlRequest(FORGOT_PASSWORD_MUTATION, {
+                    input: {
+                        email: formData.email.trim(),
+                        role: currentRole,
+                    },
+                })
+                const payload = res?.forgotPassword
+                if (payload?.success) {
+                    toast.success(payload.message || 'Reset code sent to your email!')
+                    setAuthMode('reset-password')
+                    setResendCooldown(60)
+                } else {
+                    throw new Error(payload?.message || 'Could not send reset instructions')
+                }
+            } else if (authMode === 'reset-password') {
+                if (!resetOtp || !resetOtp.trim()) {
+                    throw new Error('Please enter the 6-digit OTP code')
+                }
+                if (!resetPassword || resetPassword.length < 6) {
+                    throw new Error('New password must be at least 6 characters')
+                }
+                if (resetPassword !== resetConfirmPassword) {
+                    throw new Error("New passwords don't match")
+                }
+                const res = await graphqlRequest(RESET_PASSWORD_WITH_OTP_MUTATION, {
+                    input: {
+                        email: formData.email.trim(),
+                        otp: resetOtp.trim(),
+                        newPassword: resetPassword,
+                        role: currentRole,
+                    },
+                })
+                const payload = res?.resetPasswordWithOtp
+                if (payload?.success) {
+                    toast.success(payload.message || 'Password reset successfully! Please sign in.')
+                    setAuthMode('login')
+                    setResetOtp('')
+                    setResetPassword('')
+                    setResetConfirmPassword('')
+                } else {
+                    throw new Error(payload?.message || 'Failed to reset password')
+                }
             }
         } catch (err) {
             const errorMsg = err.message || 'Authentication failed'
@@ -334,6 +388,34 @@ function AuthFormInner({
             toast.error(errorMsg)
         } finally {
             setLoading(false)
+        }
+    }
+
+    // Handles resending the reset password OTP
+    const handleResendResetOtp = async () => {
+        if (resendCooldown > 0 || resending) return
+        if (!formData.email) {
+            toast.error('Please enter your email')
+            return
+        }
+        setResending(true)
+        try {
+            const res = await graphqlRequest(FORGOT_PASSWORD_MUTATION, {
+                input: {
+                    email: formData.email.trim(),
+                    role: currentRole,
+                },
+            })
+            if (res?.forgotPassword?.success) {
+                toast.success('A new reset OTP has been sent to your email.')
+                setResendCooldown(60)
+            } else {
+                toast.error(res?.forgotPassword?.message || 'Could not resend OTP.')
+            }
+        } catch (err) {
+            toast.error(err.message || 'Failed to resend reset OTP.')
+        } finally {
+            setResending(false)
         }
     }
 
@@ -545,6 +627,129 @@ function AuthFormInner({
                                         onClick={handleResendOtp}
                                         disabled={resending}
                                         className="inline-flex items-center gap-1 font-semibold text-green-600 hover:text-green-700 hover:underline disabled:opacity-50"
+                                    >
+                                        <RotateCw size={13} className={resending ? 'animate-spin' : ''} />
+                                        {resending ? 'Sending...' : 'Resend Code'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ) : authMode === 'reset-password' ? (
+                        /* ============================================================== */
+                        /* RESET PASSWORD WITH OTP SCREEN                                 */
+                        /* ============================================================== */
+                        <div className="space-y-6">
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={() => setAuthMode('login')}
+                                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 mb-4 transition"
+                                >
+                                    <ArrowLeft size={14} /> Back to Sign In
+                                </button>
+
+                                <div className="inline-flex p-3 rounded-2xl bg-indigo-50 text-indigo-600 mb-3 border border-indigo-100">
+                                    <Lock size={28} />
+                                </div>
+
+                                <h3 className="text-2xl font-bold text-slate-900">
+                                    Set new password
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+                                    We sent a reset OTP code to{' '}
+                                    <span className="font-semibold text-slate-800">{formData.email || 'your email'}</span>.
+                                    Enter the code and your new password.
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                                        Verification Code (OTP)
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            name="resetOtp"
+                                            required
+                                            autoFocus
+                                            maxLength={8}
+                                            value={resetOtp}
+                                            onChange={(e) => setResetOtp(e.target.value)}
+                                            placeholder="••••••"
+                                            className="w-full text-center text-2xl font-mono tracking-widest pl-4 pr-4 py-3 rounded-xl border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none text-slate-800 transition"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                                        New Password
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                            <Lock size={18} />
+                                        </div>
+                                        <input
+                                            type={showResetPassword ? "text" : "password"}
+                                            required
+                                            value={resetPassword}
+                                            onChange={(e) => setResetPassword(e.target.value)}
+                                            placeholder="At least 6 characters"
+                                            className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none text-slate-800 transition text-sm"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowResetPassword(!showResetPassword)}
+                                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                                        >
+                                            {showResetPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+                                        Confirm New Password
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                            <Lock size={18} />
+                                        </div>
+                                        <input
+                                            type={showResetPassword ? "text" : "password"}
+                                            required
+                                            value={resetConfirmPassword}
+                                            onChange={(e) => setResetConfirmPassword(e.target.value)}
+                                            placeholder="Re-enter new password"
+                                            className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none text-slate-800 transition text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={loading || !resetOtp.trim() || !resetPassword}
+                                    className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm shadow-md hover:shadow-lg active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
+                                >
+                                    <span>{loading ? 'Resetting Password...' : 'Reset Password & Sign In'}</span>
+                                    <ArrowRight size={16} />
+                                </button>
+                            </form>
+
+                            {/* Resend Code Section */}
+                            <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                                <span>Didn&apos;t receive the code?</span>
+                                {resendCooldown > 0 ? (
+                                    <span className="font-medium text-slate-400">
+                                        Resend in {resendCooldown}s
+                                    </span>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={handleResendResetOtp}
+                                        disabled={resending}
+                                        className="inline-flex items-center gap-1 font-semibold text-green-600 hover:text-green-700 hover:underline disabled:opacity-50 cursor-pointer"
                                     >
                                         <RotateCw size={13} className={resending ? 'animate-spin' : ''} />
                                         {resending ? 'Sending...' : 'Resend Code'}

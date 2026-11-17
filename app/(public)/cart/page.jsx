@@ -2,21 +2,23 @@
 import Counter from "@/components/Counter";
 import OrderSummary from "@/components/OrderSummary";
 import PageTitle from "@/components/PageTitle";
-import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
-import { Trash2Icon, LogIn, ShoppingCart, ArrowRight } from "lucide-react";
+import { deleteItemFromCart, clearCart, setCart } from "@/lib/features/cart/cartSlice";
+import { Trash2Icon, LogIn, ShoppingCart, ArrowRight, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { assets } from "@/assets/assets";
 import { useCurrency } from "@/lib/features/currency/useCurrency";
+import { graphqlRequest } from "@/lib/apiClient";
+import { REMOVE_FROM_CART_MUTATION, CLEAR_CART_MUTATION } from "@/lib/graphql/cart";
 
 export default function Cart() {
 
     const { formatPrice } = useCurrency();
 
     const { cartItems } = useSelector(state => state.cart);
-    const { isAuthenticated } = useSelector(state => state.auth);
+    const { isAuthenticated, user } = useSelector(state => state.auth);
     const products = useSelector(state => state.product.list);
 
     const dispatch = useDispatch();
@@ -40,8 +42,34 @@ export default function Cart() {
         setCartArray(cartArray);
     }
 
-    const handleDeleteItemFromCart = (productId) => {
+    const handleDeleteItemFromCart = async (productId) => {
         dispatch(deleteItemFromCart({ productId }))
+        if (isAuthenticated) {
+            try {
+                const res = await graphqlRequest(REMOVE_FROM_CART_MUTATION, {
+                    productId: String(productId),
+                    userId: user?.id ? String(user.id) : undefined,
+                })
+                if (res?.removeFromCart) {
+                    dispatch(setCart(res.removeFromCart))
+                }
+            } catch (err) {
+                console.warn('Backend removeFromCart notice:', err)
+            }
+        }
+    }
+
+    const handleClearCart = async () => {
+        dispatch(clearCart())
+        if (isAuthenticated) {
+            try {
+                await graphqlRequest(CLEAR_CART_MUTATION, {
+                    userId: user?.id ? String(user.id) : undefined,
+                })
+            } catch (err) {
+                console.warn('Backend clearCart notice:', err)
+            }
+        }
     }
 
     useEffect(() => {
@@ -80,43 +108,56 @@ export default function Cart() {
 
                 <div className="flex items-start justify-between gap-5 max-lg:flex-col">
 
-                    <table className="w-full max-w-4xl text-slate-600 table-auto">
-                        <thead>
-                            <tr className="max-sm:text-sm">
-                                <th className="text-left">Product</th>
-                                <th>Quantity</th>
-                                <th>Total Price</th>
-                                <th className="max-md:hidden">Remove</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {
-                                cartArray.map((item, index) => (
-                                    <tr key={index} className="space-x-2">
-                                        <td className="flex gap-3 my-4">
-                                            <div className="flex gap-3 items-center justify-center bg-slate-100 size-18 rounded-md">
-                                                <Image src={(Array.isArray(item.images) && item.images[0]) || item.imageUrl || assets.product_img1} className="h-14 w-auto object-contain" alt={item.name || ""} width={45} height={45} unoptimized />
-                                            </div>
-                                            <div>
-                                                <p className="max-sm:text-sm">{item.name}</p>
-                                                <p className="text-xs text-slate-500">{item.category}</p>
-                                                <p className="text-slate-700 font-medium">{formatPrice(item.price)}</p>
-                                            </div>
-                                        </td>
-                                        <td className="text-center">
-                                            <Counter productId={item.id} />
-                                        </td>
-                                        <td className="text-center">{formatPrice(item.price * item.quantity)}</td>
-                                        <td className="text-center max-md:hidden">
-                                            <button onClick={() => handleDeleteItemFromCart(item.id)} className=" text-red-500 hover:bg-red-50 p-2.5 rounded-full active:scale-95 transition-all cursor-pointer">
-                                                <Trash2Icon size={18} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            }
-                        </tbody>
-                    </table>
+                    <div className="w-full max-w-4xl">
+                        <table className="w-full text-slate-600 table-auto">
+                            <thead>
+                                <tr className="max-sm:text-sm">
+                                    <th className="text-left">Product</th>
+                                    <th>Quantity</th>
+                                    <th>Total Price</th>
+                                    <th className="max-md:hidden">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {
+                                    cartArray.map((item, index) => (
+                                        <tr key={index} className="space-x-2">
+                                            <td className="flex gap-3 my-4">
+                                                <div className="flex gap-3 items-center justify-center bg-slate-100 size-18 rounded-md">
+                                                    <Image src={(Array.isArray(item.images) && item.images[0]) || item.imageUrl || assets.product_img1} className="h-14 w-auto object-contain" alt={item.name || ""} width={45} height={45} unoptimized />
+                                                </div>
+                                                <div>
+                                                    <p className="max-sm:text-sm">{item.name}</p>
+                                                    <p className="text-xs text-slate-500">{item.category}</p>
+                                                    <p className="text-slate-700 font-medium">{formatPrice(item.price)}</p>
+                                                </div>
+                                            </td>
+                                            <td className="text-center">
+                                                <Counter productId={item.id} />
+                                            </td>
+                                            <td className="text-center">{formatPrice(item.price * item.quantity)}</td>
+                                            <td className="text-center max-md:hidden">
+                                                <button onClick={() => handleDeleteItemFromCart(item.id)} className=" text-red-500 hover:bg-red-50 p-2.5 rounded-full active:scale-95 transition-all cursor-pointer">
+                                                    <Trash2Icon size={18} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                }
+                            </tbody>
+                        </table>
+                        <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100">
+                            <Link href="/shop" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium inline-flex items-center gap-1">
+                                ← Continue Shopping
+                            </Link>
+                            <button
+                                onClick={handleClearCart}
+                                className="text-xs text-red-500 hover:text-red-700 font-medium inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                            >
+                                <Trash2Icon size={14} /> Clear entire cart
+                            </button>
+                        </div>
+                    </div>
                     <OrderSummary totalPrice={totalPrice} items={cartArray} />
                 </div>
             </div>

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "@/lib/features/auth/authSlice";
+import { graphqlRequest } from "@/lib/apiClient";
+import { LOGOUT_MUTATION } from "@/lib/graphql/auth";
 import CurrencySelector from "./CurrencySelector";
 
 const Navbar = () => {
@@ -21,9 +23,15 @@ const Navbar = () => {
         ? user.name
         : user?.username || user?.name || user?.email?.split('@')[0] || 'User'
 
-    const handleLogout = () => {
-        dispatch(logout())
-        window.location.href = '/'
+    const handleLogout = async () => {
+        try {
+            await graphqlRequest(LOGOUT_MUTATION)
+        } catch (err) {
+            console.warn('Backend logout notice:', err)
+        } finally {
+            dispatch(logout())
+            window.location.href = '/'
+        }
     }
 
     return (

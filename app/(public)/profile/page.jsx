@@ -49,6 +49,9 @@ import {
     GET_USER_QUERY,
     UPDATE_USER_MUTATION
 } from '@/lib/graphql/user'
+import {
+    CHANGE_PASSWORD_MUTATION
+} from '@/lib/graphql/auth'
 import { setAuth } from '@/lib/features/auth/authSlice'
 
 // Helper to compress and downscale user avatar images on client before storing/uploading
@@ -317,6 +320,7 @@ export default function ProfilePage() {
         new: false,
         confirm: false
     })
+    const [savingPassword, setSavingPassword] = useState(false)
 
     // Notification Preferences state
     const [preferences, setPreferences] = useState({
@@ -587,7 +591,7 @@ export default function ProfilePage() {
         setSecurityData((prev) => ({ ...prev, [name]: value }))
     }
 
-    const handleSecuritySubmit = (e) => {
+    const handleSecuritySubmit = async (e) => {
         e.preventDefault()
         if (!securityData.currentPassword) {
             toast.error('Please enter your current password')
@@ -601,13 +605,33 @@ export default function ProfilePage() {
             toast.error('New passwords do not match')
             return
         }
-        toast.success('Password updated successfully')
-        setSecurityData({
-            currentPassword: '',
-            newPassword: '',
-            confirmPassword: '',
-            twoFactorAuth: securityData.twoFactorAuth
-        })
+
+        setSavingPassword(true)
+        try {
+            const res = await graphqlRequest(CHANGE_PASSWORD_MUTATION, {
+                input: {
+                    oldPassword: securityData.currentPassword,
+                    newPassword: securityData.newPassword,
+                }
+            })
+
+            const result = res?.changePassword
+            if (result?.success) {
+                toast.success(result.message || 'Password updated successfully')
+                setSecurityData({
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmPassword: '',
+                    twoFactorAuth: securityData.twoFactorAuth
+                })
+            } else {
+                toast.error(result?.message || 'Failed to update password')
+            }
+        } catch (err) {
+            toast.error(err?.message || 'Failed to update password. Please try again.')
+        } finally {
+            setSavingPassword(false)
+        }
     }
 
     const handlePreferenceToggle = (key) => {
@@ -1340,9 +1364,20 @@ export default function ProfilePage() {
 
                                     <button
                                         type="submit"
-                                        className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium shadow-sm transition"
+                                        disabled={savingPassword}
+                                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-medium shadow-sm transition cursor-pointer"
                                     >
-                                        Update Password
+                                        {savingPassword ? (
+                                            <>
+                                                <Loader2 size={15} className="animate-spin" />
+                                                <span>Updating...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Key size={15} />
+                                                <span>Update Password</span>
+                                            </>
+                                        )}
                                     </button>
                                 </form>
 

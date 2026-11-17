@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Provider, useDispatch } from 'react-redux'
+import { Provider, useDispatch, useSelector } from 'react-redux'
 import { makeStore } from '../lib/store'
 import { setAuth, setLoading } from '@/lib/features/auth/authSlice'
+import { setCart, loadGuestCart, addToCart } from '@/lib/features/cart/cartSlice'
 import { refreshAuthToken, isTokenExpired, graphqlRequest } from '@/lib/apiClient'
 import { GET_ME_QUERY } from '@/lib/graphql/user'
 import { GET_PRODUCTS_QUERY } from '@/lib/graphql/product'
+import { GET_CART_QUERY, ADD_TO_CART_MUTATION } from '@/lib/graphql/cart'
 import { setProduct, setLoading as setProductLoading } from '@/lib/features/product/productSlice'
 import { detectCurrencyCodeFromEnv, setCurrency, CURRENCIES, COUNTRY_TO_CURRENCY } from '@/lib/features/currency/currencySlice'
 
@@ -277,6 +279,85 @@ function CurrencyInitializer() {
   return null
 }
 
+/**
+ * CartInitializer — Hybrid Cart Synchronization
+ *
+ * Guest state: items are stored in localStorage (via cartSlice reducers).
+ * On authentication:
+ *   1. Push every un-synced local item to the backend cart-service (addToCart mutations).
+ *   2. Fetch the authoritative backend cart and replace local Redux state via setCart.
+ * On logout / unauthenticated: restore guest cart from localStorage into Redux.
+ */
+function CartInitializer() {
+  const dispatch = useDispatch()
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated)
+  const authLoading = useSelector((state) => state.auth.loading)
+  const cartSynced = useSelector((state) => state.cart.synced)
+  const hasSyncedRef = useRef(false)
+
+  // On mount (before auth resolved): seed Redux with the guest localStorage cart
+  useEffect(() => {
+    const guestItems = loadGuestCart()
+    const hasItems = Object.keys(guestItems).length > 0
+    if (hasItems) {
+      // Dispatch individual addToCart so total stays correct
+      for (const [productId, qty] of Object.entries(guestItems)) {
+        for (let i = 0; i < qty; i++) {
+          dispatch(addToCart({ productId }))
+        }
+      }
+    }
+  }, [dispatch])
+
+  // When authentication resolves: sync local → backend then fetch authoritative cart
+  useEffect(() => {
+    if (authLoading) return               // wait until auth is resolved
+    if (!isAuthenticated) {
+      hasSyncedRef.current = false        // reset so next login triggers sync
+      return
+    }
+    if (hasSyncedRef.current) return      // already synced this session
+    hasSyncedRef.current = true
+
+    const syncCart = async () => {
+      try {
+        // 1. Push any local guest items to the backend
+        const guestItems = loadGuestCart()
+        const pushPromises = []
+        for (const [productId, qty] of Object.entries(guestItems)) {
+          if (qty > 0) {
+            pushPromises.push(
+              graphqlRequest(ADD_TO_CART_MUTATION, {
+                input: {
+                  productId: String(productId),
+                  quantity: Number(qty),
+                },
+              }).catch(() => null)
+            )
+          }
+        }
+        if (pushPromises.length > 0) {
+          await Promise.all(pushPromises)
+        }
+
+        // 2. Fetch authoritative backend cart and replace local state
+        const data = await graphqlRequest(GET_CART_QUERY)
+        if (data?.cart) {
+          dispatch(setCart(data.cart))
+        } else if (Array.isArray(data?.cart?.items)) {
+          dispatch(setCart(data.cart.items))
+        }
+      } catch (err) {
+        console.warn('CartInitializer sync notice:', err)
+      }
+    }
+
+    syncCart()
+  }, [isAuthenticated, authLoading, dispatch])
+
+  return null
+}
+
 export default function StoreProvider({ children }) {
   const storeRef = useRef(undefined)
   if (!storeRef.current) {
@@ -289,6 +370,7 @@ export default function StoreProvider({ children }) {
       <AuthInitializer />
       <ProductInitializer />
       <CurrencyInitializer />
+      <CartInitializer />
       {children}
     </Provider>
   )
